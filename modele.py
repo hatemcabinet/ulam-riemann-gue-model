@@ -4,10 +4,14 @@ import numpy as np
 from mpmath import zetazero
 import scipy.sparse as sp
 from scipy.sparse.linalg import LinearOperator, eigsh
-from scipy.special import erf
+from scipy.integrate import quad
 from scipy.stats import kstest
 
+# ==========================================
+# 1. OUTILS DE BASE & PRIMALITÉ
+# ==========================================
 def est_premier(n):
+    """Vérifie si un nombre est premier de manière efficace."""
     if n < 2: return False
     if n in (2, 3): return True
     if n % 2 == 0 or n % 3 == 0: return False
@@ -17,7 +21,11 @@ def est_premier(n):
         i += 6
     return True
 
+# ==========================================
+# 2. GÉOMÉTRIE DE LA GRILLE & CRIBLE PAR LES TROUS
+# ==========================================
 def generer_trous_premiers(max_k=20):
+    print(" [*] Génération des trous premiers de la spirale d'Ulam...")
     nombres_couverts = set()
     for k in range(max_k + 1):
         nombres_couverts.add(4*k**2 - 2*k + 41)
@@ -50,7 +58,11 @@ def generer_trous_premiers(max_k=20):
 
     return np.column_stack((coords_x, coords_y))
 
+# ==========================================
+# 3. TOPOLOGIE FRACTALE (BOX-COUNTING)
+# ==========================================
 def calculer_dimension_fractale(points):
+    """Calcule la dimension fractale D_0 du nuage de points."""
     if len(points) < 10: return 0.0
     min_vals = np.min(points, axis=0)
     points_shifted = points - min_vals
@@ -70,13 +82,27 @@ def calculer_dimension_fractale(points):
     coeffs = np.polyfit(np.log(1.0 / epsilons), np.log(counts), 1)
     return coeffs[0]
 
+# ==========================================
+# 4. OPÉRATEUR DE GALERKIN SCALABLE HAUTE PERFORMANCE
+# ==========================================
 def analyser_spectre_quantique_scalable(num_zeros=1500, N=1000, bandwidth=60):
+    """
+    Construit un LinearOperator implicite et utilise ARPACK (eigsh) 
+    pour gérer de grandes dimensions N (ex: 1000 à 5000+) sans saturer la mémoire.
+    """
+    print(f" [*] Extraction de {num_zeros} zéros de Riemann et construction de l'opérateur creux pour N = {N}...")
+    
+    # 1. Extraction des zéros de zeta et pondération
     zeros_t = [float(zetazero(n).imag) for n in range(1, num_zeros + 1)]
     zeros_arr = np.array(zeros_t)
     weights = 1.0 / np.sqrt(zeros_arr)
+
+    # Pré-calcul de la matrice de base sinusoïdale S de dimension (N, num_zeros)
     indices = np.arange(1, N + 1)[:, np.newaxis]
     sin_mat = np.sin(indices * zeros_arr)
-    weighted_sin = sin_mat * weights
+    weighted_sin = sin_mat * weights  # S * W
+
+    # 2. Construction de Q_inf sous forme de matrice creuse (CSR) avec seuillage de bande
     diag_vals = ((np.arange(1, N + 1) * np.pi)**2) / (2.0 * N)
     row_idx, col_idx, data_vals = [], [], []
     
@@ -84,22 +110,30 @@ def analyser_spectre_quantique_scalable(num_zeros=1500, N=1000, bandwidth=60):
         row_idx.append(i); col_idx.append(i); data_vals.append(diag_vals[i])
         for j in range(max(0, i - bandwidth), min(N, i + bandwidth + 1)):
             if i != j:
-                # CORRECTION : Utilisation de np.cos pour garantir la symétrie de la matrice
-                val = 0.05 * np.cos(i - j) / (1.0 + abs(i - j))
-                if abs(val) > 1e-4:
+                val = 0.05 * np.sin(i - j) / (1.0 + abs(i - j))
+                if abs(val) > 1e-4:  # Filtre de sparsité
                     row_idx.append(i); col_idx.append(j); data_vals.append(val)
                     
     Q_inf_sparse = sp.csr_matrix((data_vals, (row_idx, col_idx)), shape=(N, N), dtype=complex)
+
+    # 3. Définition de l'opérateur linéaire implicite (LinearOperator)
     def matvec(v):
+        # Produit matriciel efficace pour Q_prime = sin_mat @ (weighted_sin.T @ v)
         term_q_prime = sin_mat @ (weighted_sin.T @ v)
+        # Produit avec la matrice creuse Q_inf
         term_q_inf = Q_inf_sparse @ v
         total = term_q_prime + term_q_inf
         return 0.5 * (total + np.conj(total))
-    
+
     H_op = LinearOperator((N, N), matvec=matvec, dtype=complex)
+
+    # 4. Résolution spectrale itérative par Lanczos (ARPACK via eigsh)
     k_evals = min(300, N - 2)
+    print(f" [*] Calcul de {k_evals} valeurs propres par le solveur itératif (eigsh)...")
     evals, _ = eigsh(H_op, k=k_evals, which='SA', tol=1e-6)
     evals = np.sort(evals)
+
+    # 5. Dépliage (*unfolding*) et espacements normalisés
     indices_eval = np.arange(1, len(evals) + 1)
     poly = np.polyfit(evals, indices_eval, deg=2)
     unfolded = np.polyval(poly, evals)
@@ -108,15 +142,17 @@ def analyser_spectre_quantique_scalable(num_zeros=1500, N=1000, bandwidth=60):
     
     return evals, spacings
 
+# Fonction de répartition théorique (CDF) du GUE
 def gue_cdf(s):
-    """CDF analytique exacte de la loi Wigner-Dyson (GUE)"""
     if s < 0: return 0.0
-    a = 4.0 / np.pi
-    # Formule analytique intégrant P(s) = (32 / pi^2) * s^2 * exp(-(4 / pi) * s^2)
-    return float(erf(np.sqrt(a) * s) - (4.0 * s / np.pi) * np.exp(-a * s**2))
+    val, _ = quad(lambda x: (32.0 / (np.pi**2)) * (x**2) * np.exp(-(4.0 / np.pi) * (x**2)), 0, s)
+    return val
 
 vectorized_gue_cdf = np.vectorize(gue_cdf)
 
+# ==========================================
+# EXÉCUTION PRINCIPALE
+# ==========================================
 if __name__ == "__main__":
     print("=" * 70)
     print(" MODÈLE SCALABLE : OPÉRATEUR CREUX & LANCZOS (N = 1000)")
@@ -126,6 +162,7 @@ if __name__ == "__main__":
     dim_fractale = calculer_dimension_fractale(points_trous)
     print(f" -> Dimension fractale (D_0) des trous premiers : {dim_fractale:.4f}")
     
+    # Exécution à grande échelle : Matrice N=1000 avec 1500 zéros de Riemann
     evals, spacings = analyser_spectre_quantique_scalable(num_zeros=1500, N=1000, bandwidth=60)
     print(f" -> Espacement moyen normalisé : {np.mean(spacings):.4f}")
     
@@ -136,12 +173,15 @@ if __name__ == "__main__":
     print(" [SUCCÈS] Pipeline scalable exécuté avec succès.")
     print("=" * 70)
     
+    # Affichage graphique des résultats
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    
     axes[0].scatter(points_trous[:, 0], points_trous[:, 1], color='indigo', s=12, alpha=0.7)
     axes[0].set_title(f"Distribution Spatiale (D_0: {dim_fractale:.3f})")
     axes[0].grid(True, linestyle=":", alpha=0.6)
     
     axes[1].hist(spacings, bins=35, density=True, color='crimson', alpha=0.5, edgecolor='black', label="Simulé (N=1000)")
+    
     s_vals = np.linspace(0, max(max(spacings), 3.0), 200)
     p_gue = (32.0 / (np.pi**2)) * (s_vals**2) * np.exp(-(4.0 / np.pi) * (s_vals**2))
     axes[1].plot(s_vals, p_gue, color='blue', linewidth=2.5, label="Théorie Wigner-Dyson (GUE)")
@@ -153,5 +193,5 @@ if __name__ == "__main__":
     axes[1].legend()
     
     plt.tight_layout()
-    plt.savefig("modele_scalable_sparse.png", dpi=300)
+    plt.savefig("modele_scalable_sparse_fr.png", dpi=300)
     plt.show()
