@@ -1,18 +1,10 @@
-
----
-
-### 2. Le code Python propre (`modele.py`)
-
-Voici le code complet, propre et sans erreurs de formatage pour votre fichier de script :
-
-```python
 import mpmath
 import matplotlib.pyplot as plt
 import numpy as np
 from mpmath import zetazero
 import scipy.sparse as sp
 from scipy.sparse.linalg import LinearOperator, eigsh
-from scipy.integrate import quad
+from scipy.special import erf
 from scipy.stats import kstest
 
 def est_premier(n):
@@ -92,7 +84,8 @@ def analyser_spectre_quantique_scalable(num_zeros=1500, N=1000, bandwidth=60):
         row_idx.append(i); col_idx.append(i); data_vals.append(diag_vals[i])
         for j in range(max(0, i - bandwidth), min(N, i + bandwidth + 1)):
             if i != j:
-                val = 0.05 * np.sin(i - j) / (1.0 + abs(i - j))
+                # CORRECTION : Utilisation de np.cos pour garantir la symétrie de la matrice
+                val = 0.05 * np.cos(i - j) / (1.0 + abs(i - j))
                 if abs(val) > 1e-4:
                     row_idx.append(i); col_idx.append(j); data_vals.append(val)
                     
@@ -102,6 +95,7 @@ def analyser_spectre_quantique_scalable(num_zeros=1500, N=1000, bandwidth=60):
         term_q_inf = Q_inf_sparse @ v
         total = term_q_prime + term_q_inf
         return 0.5 * (total + np.conj(total))
+    
     H_op = LinearOperator((N, N), matvec=matvec, dtype=complex)
     k_evals = min(300, N - 2)
     evals, _ = eigsh(H_op, k=k_evals, which='SA', tol=1e-6)
@@ -115,9 +109,11 @@ def analyser_spectre_quantique_scalable(num_zeros=1500, N=1000, bandwidth=60):
     return evals, spacings
 
 def gue_cdf(s):
+    """CDF analytique exacte de la loi Wigner-Dyson (GUE)"""
     if s < 0: return 0.0
-    val, _ = quad(lambda x: (32.0 / (np.pi**2)) * (x**2) * np.exp(-(4.0 / np.pi) * (x**2)), 0, s)
-    return val
+    a = 4.0 / np.pi
+    # Formule analytique intégrant P(s) = (32 / pi^2) * s^2 * exp(-(4 / pi) * s^2)
+    return float(erf(np.sqrt(a) * s) - (4.0 * s / np.pi) * np.exp(-a * s**2))
 
 vectorized_gue_cdf = np.vectorize(gue_cdf)
 
