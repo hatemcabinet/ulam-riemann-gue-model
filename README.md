@@ -32,3 +32,20 @@ Pour s'assurer que les propriétés spectrales observées reflètent une structu
 | **Null_Control_Random** | 3 | 0.1310 | 8.90e-03 | 0.9994 |
 
 *Interprétation :* La divergence observable entre les métriques des zéros de Riemann et celles des contrôles aléatoires permet de quantifier la sensibilité du pipeline face au bruit.
+## 🎯 Bilan et Perspectives Scientifiques
+
+Ce projet démontre qu'il est possible de concevoir un laboratoire de recherche numérique modulaire et rigoureux, explorant l'intersection entre l'arithmétique discrète (spirale d'Ulam), la topologie fractale et la théorie des matrices aléatoires (GUE).
+
+### 📋 Synthèse des Réalisations
+- **Architecture Numérique :** Mise en place d'un opérateur de Galerkin creux optimisé via `scipy.sparse` et `LinearOperator`, évitant toute saturation mémoire lors du calcul spectral.
+- **Rigueur Expérimentale :** Intégration d'un protocole de **contrôle nul** (comparaison Monte-Carlo avec des fréquences aléatoires) pour dissocier les véritables signatures structurelles des artéfacts numériques.
+- **Reproductibilité Totale :** Automatisation de l'export des données sous forme de rapports structurés et de séries d'espacements bruts (`null_control_report.csv`, `spectral_spacings.csv`).
+
+### ⚠️ Avertissement Épistémologique
+Bien que l'analyse statistique (tests de Kolmogorov-Smirnov) permette d'évaluer l'adéquation des spectres avec la théorie GUE, ces observations constituent une **approche exploratoire et phénoménologique**. Elles ne sauraient constituer, à elles seules, une démonstration formelle de l'hypothèse de Riemann. Cela souligne l'importance cardinale de maintenir des contrôles nuls stricts dans toute recherche computationalle en physique mathématique.
+
+### 🔮 Poursuivre l'Exploration
+Le framework est entièrement ouvert aux contributions et aux extensions futures, notamment :
+1. **Dépliage Local :** Remplacer l'ajustement polynomial global par une estimation de densité spectrale locale pour affiner l'analyse des espacements.
+2. **Passage à l'Échelle :** Exploiter des tranches de zéros de Riemann à très haute altitude ($t > 10^5$) pour tester la robustesse asymptotique du modèle.
+3. **Automatisation Graphique :** Intégrer les scripts de visualisation dans un pipeline d'export automatique d'images.
