@@ -1,14 +1,15 @@
-# Projet Unifié : Spirale d'Ulam, Fractales et Spectre GUE
+# 🌌 Exploration Numérique : Spirale d'Ulam, Topologie Fractale et Chaos Quantique
 
-Ce projet est un laboratoire numérique explorant les ponts profonds entre l'arithmétique géométrique, la topologie fractale et le chaos quantique.
+Ce projet est un laboratoire numérique explorant les ponts entre l'arithmétique discrète, la géométrie fractale et le chaos quantique.
 
-## Vue d'ensemble du projet
-* **L'arithmétique géométrique :** La spirale d'Ulam et l'isolation des trous premiers.
-* **La topologie fractale :** L'estimation de la dimension fractale par la méthode du box-counting.
-* **Le chaos quantique (GUE) :** La construction d'un opérateur spectral de Galerkin alimenté par les zéros de la fonction Zeta de Riemann.
-* **La haute performance :** L'utilisation de matrices creuses et d'un solveur itératif pour supporter de grandes dimensions.
+## 📁 Structure du Projet
 
-## Installation et Utilisation
+- **`modele.py`** : Script principal exécutant le pipeline unifié (spirale d'Ulam, dimension $D_0$ et opérateur spectral creux).
+- **`test_scaling.py`** : Programme de vérification de la convergence de la dimension fractale $D_0$ selon la taille de la grille ($max\_k$).
+- **`test_sensitivity.py`** : Test de robustesse et de sensibilité spectrale face aux variations des paramètres (zéros de Riemann, dimension $N$, bande passante).
+
+## 🚀 Utilisation et Validation
+
+Installez les dépendances :
 ```bash
 pip install numpy matplotlib mpmath scipy
-python modele.py
